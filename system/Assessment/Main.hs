@@ -1,11 +1,9 @@
 module Main where
 
-import Data.Aeson (ToJSON)
-import Dhall
-import Events
+import Events (Event(..))
 import Flow
-import Protolude hiding (Type)
-import Shikensu
+import Protolude
+import Shikensu (Definition(..), Dictionary)
 import System.Directory (createDirectoryIfMissing, withCurrentDirectory)
 import System.FilePath (joinPath)
 
@@ -18,6 +16,8 @@ import qualified Data.Text.Lazy as Text.Lazy
 import qualified Data.Text.Lazy.Encoding as Text.Lazy
 import qualified Data.Text.Lazy.IO as Text.Lazy
 import qualified Database
+import qualified Dhall
+import qualified Shikensu
 import qualified Shikensu.Contrib.IO as Shikensu
 
 
@@ -65,10 +65,10 @@ data Payload
     deriving (Generic, Show)
 
 
-instance ToJSON (Event Payload)
-instance ToJSON Payload
-instance Interpret (Event Payload)
-instance Interpret Payload
+instance Aeson.ToJSON (Event Payload)
+instance Aeson.ToJSON Payload
+instance Dhall.Interpret (Event Payload)
+instance Dhall.Interpret Payload
 
 
 
@@ -121,7 +121,7 @@ decodeDhallProgram content =
         |> map Text.decodeUtf8
         |> map Text.Lazy.fromStrict
         |> Maybe.fromMaybe ""
-        |> Dhall.input auto
+        |> Dhall.input Dhall.auto
         |> Dhall.detailed
 
 
@@ -143,7 +143,7 @@ processPayload io = do
 
 {-| Adds an event to the Ledger.
 -}
-addEventToLedger :: ToJSON a => Definition -> a -> IO ()
+addEventToLedger :: Aeson.ToJSON a => Definition -> a -> IO ()
 addEventToLedger Definition{ basename } event =
     event
         |> Aeson.encodePretty
