@@ -1,0 +1,5 @@
+λ(tableName : Text) →
+
+    ''
+    CREATE TABLE ${tableName}();
+    ''

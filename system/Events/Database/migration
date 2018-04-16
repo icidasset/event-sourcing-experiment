@@ -1,0 +1,22 @@
+λ(t : Integer) →
+λ(q : List Text) →
+
+    { timestamp     = t
+    , typ           = "DATABASE_MIGRATION"
+    , version       = 1
+
+    --
+
+    , payload       =
+
+        < DatabaseMigration = { queries = q }
+        | None : {}
+        >
+
+        :
+
+        ../Payload
+
+    --
+
+    } : ../Event

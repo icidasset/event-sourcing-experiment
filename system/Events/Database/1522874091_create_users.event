@@ -1,0 +1,7 @@
+./migration
+
+    1522874091
+
+    [ ./createTable "users"
+    , ./addColumn "users" "email" "varchar(250)"
+    ]

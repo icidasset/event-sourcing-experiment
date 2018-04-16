@@ -1,0 +1,8 @@
+λ(tableName : Text) →
+λ(columnName : Text) →
+λ(columnDefinition : Text) →
+
+    ''
+    ALTER TABLE ${tableName}
+    ADD ${columnName} ${columnDefinition};
+    ''
