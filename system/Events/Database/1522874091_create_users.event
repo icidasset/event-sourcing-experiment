@@ -2,6 +2,17 @@
 
     1522874091
 
-    [ ./createTable "users"
-    , ./addColumn "users" "email" "varchar(250)"
+    [ ./createTable
+        "users"
+        [ { field = "id", type = "SERIAL PRIMARY KEY" }
+        ]
+
+    -- Enable `CITEXT` type
+    , "CREATE EXTENSION citext"
+
+    -- Add `email` column as well
+    , ./addColumn
+        "users"
+        "email"
+        "CITEXT"
     ]

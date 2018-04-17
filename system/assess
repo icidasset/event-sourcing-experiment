@@ -1,2 +1,2 @@
 #!/bin/bash
-stack build :assess_system --exec assess_system
+stack build :assess_system --exec assess_system --fast

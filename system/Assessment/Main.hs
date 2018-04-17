@@ -7,6 +7,7 @@ import Shikensu (Definition(..), Dictionary)
 import System.Directory (createDirectoryIfMissing, withCurrentDirectory)
 import System.FilePath (joinPath)
 
+import qualified Control.Exception.Safe as Safe
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encode.Pretty as Aeson
 import qualified Data.List as List
@@ -82,18 +83,26 @@ instance Dhall.Interpret Payload
 sequentialEventProcessor :: Dictionary -> IO ()
 sequentialEventProcessor =
     let
+        log :: [ Char ] -> IO ()
+        log = putStrLn
+
         fold acc [] = acc
-        fold acc (x:xs) = do
-            result <- try (acc >> processEvent x) :: IO (Either SomeException Aeson.Value)
+        fold acc (def:rest) = do
+            result <- Safe.tryAny (acc >> processEvent def)
 
             case result of
                 Left exception ->
-                    putStrLn (displayException exception)
+                    -- Show error message and stop sequence
+                    log ("") >>
+                    log (basename def <> extname def <> " produced an error: \x1b[31m") >>
+                    log (displayException exception <> "\x1b[0m")
 
                 Right value ->
-                    fold (addEventToLedger x value) xs
+                    -- Add event to ledger and carry on
+                    fold (addEventToLedger def value) rest
     in
         fold $ return ()
+
 
 
 {-| Decode the Dhall program into an `Event`,

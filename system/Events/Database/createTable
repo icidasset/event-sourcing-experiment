@@ -1,5 +1,14 @@
+let Column = { field : Text, type : Text } in
+let List/map = https://ipfs.io/ipfs/QmdtKd5Q7tebdo6rXfZed4kN6DXmErRQHJ4PsNCtca9GbB/Prelude/List/map in
+let Text/concatSep = https://ipfs.io/ipfs/QmdtKd5Q7tebdo6rXfZed4kN6DXmErRQHJ4PsNCtca9GbB/Prelude/Text/concatSep in
+
+
 λ(tableName : Text) →
+λ(fields : List Column) →
+
+    let colToText = λ(col : Column) → "${col.field} ${col.type}" in
+    let columns = List/map Column Text colToText fields in
 
     ''
-    CREATE TABLE ${tableName}();
+    CREATE TABLE ${tableName}(${Text/concatSep ", " columns});
     ''

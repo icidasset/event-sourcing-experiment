@@ -36,6 +36,7 @@ migrate migration = do
         |> queries
         |> map (execute conn)
         |> sequence
+        |> Postgres.withTransaction conn
 
     -- Close connection
     Postgres.close conn

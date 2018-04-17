@@ -1,0 +1,6 @@
+./migration
+
+    1523989143
+
+    [ ./addColumn "users" "created_at" "TIMESTAMPTZ"
+    ]
