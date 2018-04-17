@@ -31,7 +31,8 @@ migrate migration = do
     -- https://www.postgresql.org/docs/9.5/static/libpq-envars.html
     conn <- Postgres.connectPostgreSQL "dbname=event-sourcing-experiment"
 
-    -- Execute all queries sequentially
+    -- Execute all queries sequentially,
+    -- rolls back all of them if any fails.
     migration
         |> queries
         |> map (execute conn)
