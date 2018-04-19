@@ -4,6 +4,7 @@ import Flow
 import Protolude
 
 import qualified Data.String as String (fromString)
+import qualified Data.Text as Strict (Text)
 import qualified Data.Text.Lazy as Lazy (Text)
 import qualified Data.Text.Lazy as Text.Lazy
 import qualified Database.PostgreSQL.Simple as Postgres
@@ -21,35 +22,51 @@ data Migration = Migration
 
 
 
+-- ⚡️
+
+
+connect :: IO Postgres.Connection
+connect =
+    -- Establish a PostgreSQL connection
+    -- Define environment variables according to the following:
+    -- https://www.postgresql.org/docs/9.5/static/libpq-envars.html
+    Postgres.connectPostgreSQL "dbname=event-sourcing-experiment"
+
+
+disconnect :: Postgres.Connection -> IO ()
+disconnect =
+    Postgres.close
+
+
+
 -- 🛳
 
 
 migrate :: Migration -> IO ()
 migrate migration = do
-    -- Establish a PostgreSQL connection
-    -- Define environment variables according to the following:
-    -- https://www.postgresql.org/docs/9.5/static/libpq-envars.html
-    conn <- Postgres.connectPostgreSQL "dbname=event-sourcing-experiment"
+    conn <- connect
 
     -- Execute all queries sequentially,
     -- rolls back all of them if any fails.
     migration
         |> queries
-        |> map (execute conn)
-        |> sequence
-        |> Postgres.withTransaction conn
+        |> map Text.Lazy.unpack
+        |> execute conn
 
     -- Close connection
-    Postgres.close conn
+    disconnect conn
 
 
 
 -- 🚀
 
 
-execute :: Postgres.Connection -> Lazy.Text -> IO Int64
-execute conn query =
-    query
-        |> Text.Lazy.unpack
-        |> String.fromString
-        |> Postgres.execute_ conn
+{-| Execute a bunch of queries in a transaction.
+-}
+execute :: Postgres.Connection -> [ [ Char ] ] -> IO ()
+execute conn queries =
+    queries
+        |> map (String.fromString .> Postgres.execute_ conn)
+        |> sequence
+        |> map (const ())
+        |> Postgres.withTransaction conn

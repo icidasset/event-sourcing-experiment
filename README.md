@@ -1,7 +1,7 @@
 There are two types of events:
 
-- [x] System-level events
-- [ ] Application-level events
+1. System-level events
+2. Application-level events
 
 
 
@@ -41,3 +41,18 @@ Application-level events are stored in Redis.
 - Redis pub/sub will be used to listen to events.
 - Each system that reproduces the state from the ledger stores
   the hash that it last used, so it knows what to execute.
+
+```shell
+# Boot up application
+./app/boot
+```
+
+
+
+## Notes
+
+As this is an experiment, there are obviously quite a few things missing. I'm making a list of them here, in case I might use this system in production sometime in the future.
+
+- Database connection pool
+- Environment handling (`dev`, `production`, etc)
+- Asynchronous error handling

@@ -2,5 +2,5 @@
 
     1523989143
 
-    [ ./addColumn "users" "created_at" "TIMESTAMPTZ"
+    [ ./addColumn "users" "created_at" "TIMESTAMPTZ default current_timestamp"
     ]
