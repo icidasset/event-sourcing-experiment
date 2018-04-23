@@ -23,6 +23,9 @@ createdb event-sourcing-experiment
 
 # Compile all events and execute the new ones
 ./system/assess
+
+# Reset and replay entire history
+./system/replay
 ```
 
 
