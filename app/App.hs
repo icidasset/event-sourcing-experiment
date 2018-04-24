@@ -7,13 +7,11 @@ import Web.Scotty as Scotty
 
 import qualified Crypto.Hash.MD5 as MD5
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteString as Strict (ByteString)
 import qualified Data.ByteString.Lazy as ByteString.Lazy
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.UnixTime as UnixTime (UnixTime(..), getUnixTime)
 import qualified Database.Redis as Redis
 import qualified Redis
 import qualified Subjects.User
+import qualified Time
 
 
 -- | (• ◡•)| (❍ᴥ❍ʋ)
@@ -21,14 +19,6 @@ import qualified Subjects.User
 
 main :: IO ()
 main = do
-
-    -- TODO
-    -- ----
-
-    -- Check if we missed anything from the event stream.
-    -- The application might have been offline while events were published.
-    -- Decrypt the stored MD5 hash to see what the last received event was.
-
 
     -- Redis
     -- -----
@@ -38,9 +28,17 @@ main = do
     -- Subscribe to channel and listen for messages.
     -- This happens asynchronously, so we can use scotty as well.
     (onMessage conn)
-        |> Redis.pubSub subscription
+        |> Redis.pubSub Redis.subscription
         |> Redis.runRedis conn
         |> async
+
+
+    -- TODO
+    -- ----
+
+    -- Check if we missed anything from the event stream.
+    -- The application might have been offline while events were published.
+    -- Decrypt the stored MD5 hash to see what the last received event was.
 
 
     -- Scotty
@@ -48,49 +46,14 @@ main = do
 
     scotty 4567 $ do
 
-        let beamMeUpScotty = liftIO
-
         -- POST /users
         -- Creates a user record.
         --
-        post "/users" $ do
-
-            e <- param "email"
-            t <- beamMeUpScotty currentUnixTime
-
-            -- Create event
-            let event   = Subjects.User.creationEvent e t
-            let msg     = ByteString.Lazy.toStrict (Aeson.encode event)
-
-            -- Send event to Redis
-            [ msg ]
-                |> Redis.rpush key
-                |> Redis.runRedis conn
-                |> beamMeUpScotty
-
-            msg
-                |> Redis.publish channel
-                |> Redis.runRedis conn
-                |> beamMeUpScotty
-
-            -- Response
-            Scotty.text "{ \"data\": { \"authToken\": \"example\" } }"
+        post "/users" (createUser conn)
 
 
 
--- Redis
-
-
-channel :: Strict.ByteString
-channel = "event-sourcing-experiment"
-
-
-key :: Strict.ByteString
-key = channel
-
-
-subscription :: Redis.PubSub
-subscription = Redis.subscribe [ channel ]
+-- Subscriptions
 
 
 {-| Function that will be called when we receive a message from the channel.
@@ -105,10 +68,11 @@ onMessage conn msg = do
     msg
         |> Redis.msgMessage
         |> MD5.hash
-        |> Redis.set "SYSTEM_IDENTIFIER_GOES_HERE"
+        |> Redis.set Redis.hashStorageKey
         |> Redis.runRedis conn
 
     -- Do something with the event.
+    -- {!} Asynchronous IO
     msg
         |> Redis.decodeMessage
         |> map eventHandler
@@ -126,7 +90,6 @@ eventHandler :: NakedEvent -> Redis.Message -> IO ()
 eventHandler NakedEvent { typ = "CREATE_USER" } = tryDoing Subjects.User.create
 eventHandler _ = const mempty
 
-
 {-| Decode the Redis message based on a "handler" function,
     and then run the handler function with the result.
 -}
@@ -135,11 +98,33 @@ tryDoing fn = Redis.decodeMessage .> maybe mempty fn
 
 
 
--- Utilities
+-- Scotty
 
 
-{-| Get the current unix time in seconds.
--}
-currentUnixTime :: IO Integer
-currentUnixTime =
-    map (UnixTime.utSeconds .> fromEnum .> toInteger) UnixTime.getUnixTime
+beamMeUpScotty :: MonadIO m => IO a -> m a
+beamMeUpScotty = liftIO
+
+
+createUser :: Redis.Connection -> Scotty.ActionM ()
+createUser conn = do
+
+    e <- param "email"
+    t <- beamMeUpScotty Time.currentUnixTime
+
+    -- Create event
+    let event   = Subjects.User.creationEvent e t
+    let msg     = ByteString.Lazy.toStrict (Aeson.encode event)
+
+    -- Send event to Redis
+    [ msg ]
+        |> Redis.rpush Redis.eventStreamKey
+        |> Redis.runRedis conn
+        |> beamMeUpScotty
+
+    msg
+        |> Redis.publish Redis.channel
+        |> Redis.runRedis conn
+        |> beamMeUpScotty
+
+    -- Response
+    Scotty.text "{ \"data\": { \"authToken\": \"example\" } }"

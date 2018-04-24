@@ -30,7 +30,6 @@ dependencies:
   - scotty == 0.11.*
   - shikensu == 0.3.*
   - text == 1.2.*
-  - unordered-containers == 0.2.*
   - unix-time == 0.3.*
 
 
