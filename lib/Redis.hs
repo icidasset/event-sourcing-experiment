@@ -1,7 +1,7 @@
 module Redis where
 
 import Flow
-import Protolude (Maybe(..))
+import Protolude
 
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as Strict (ByteString)
@@ -29,7 +29,7 @@ subscription = Redis.subscribe [ channel ]
 
 
 
--- Helper functions
+-- Subscriptions
 
 
 decodeMessage :: Aeson.FromJSON a => Redis.Message -> Maybe a
@@ -38,3 +38,23 @@ decodeMessage msg =
         |> Redis.msgMessage
         |> ByteString.Lazy.fromStrict
         |> Aeson.decode
+
+
+
+-- Shortcuts
+
+
+run :: Redis.Connection -> a -> (Redis.Redis (Either e a)) -> IO a
+run conn defaultValue action =
+    action
+        |> Redis.runRedis conn
+        |> map (either (const defaultValue) identity)
+
+
+
+-- Messages
+
+
+msgFromString :: Strict.ByteString -> Redis.Message
+msgFromString s =
+    Redis.Message { Redis.msgChannel = "", Redis.msgMessage = s }

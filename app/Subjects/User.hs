@@ -1,5 +1,6 @@
 module Subjects.User where
 
+import Data.Time.Clock (UTCTime)
 import Database.PostgreSQL.Simple (Only(..))
 import Events (Event(..))
 import Flow
@@ -71,7 +72,7 @@ create event = do
     let e = email (u :: UserRaw)
 
     -- Create user and get the `id` and `created_at`
-    ((id :: Integer, created_at :: Text) : _) <- Postgres.query conn q (Only e)
+    ((id :: Integer, created_at :: UTCTime) : _) <- Postgres.query conn q (Only e)
 
     -- Close connection
     Database.disconnect conn

@@ -18,7 +18,6 @@ dependencies:
   - aeson-pretty == 0.8.*
   - base >= 4.7 && < 5
   - bytestring
-  - cryptohash-md5 == 0.11.*
   - dhall == 1.11.*
   - directory == 1.3.*
   - filepath == 1.4.*
@@ -30,6 +29,7 @@ dependencies:
   - scotty == 0.11.*
   - shikensu == 0.3.*
   - text == 1.2.*
+  - time == 1.8.*
   - unix-time == 0.3.*
 
 

@@ -2,11 +2,13 @@ module Main where
 
 import Events (NakedEvent(..))
 import Flow
+import Prelude (read)
 import Protolude hiding (ByteString)
 import Web.Scotty as Scotty
 
-import qualified Crypto.Hash.MD5 as MD5
 import qualified Data.Aeson as Aeson
+import qualified Data.ByteString as Strict (ByteString)
+import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import qualified Database.Redis as Redis
 import qualified Redis
@@ -26,19 +28,39 @@ main = do
     conn <- Redis.checkedConnect Redis.defaultConnectInfo
 
     -- Subscribe to channel and listen for messages.
-    -- This happens asynchronously, so we can use scotty as well.
+    -- {!} Asynchronous IO
+
     (onMessage conn)
         |> Redis.pubSub Redis.subscription
         |> Redis.runRedis conn
         |> async
 
 
-    -- TODO
-    -- ----
+    -- Continuation
+    -- ------------
+    -- This goes through all the unprocessed events,
+    -- in case our app was offline for a bit.
 
-    -- Check if we missed anything from the event stream.
-    -- The application might have been offline while events were published.
-    -- Decrypt the stored MD5 hash to see what the last received event was.
+    let run = Redis.run conn
+    let fif = map (BC8.unpack .> read .> \x -> x + 1) .> fromMaybe 0
+    let eif = \x -> x - 1
+
+    fromIndex   <- map fif (run Nothing $ Redis.get Redis.hashStorageKey)
+    endIndex    <- map eif (run 0       $ Redis.llen Redis.eventStreamKey)
+    events      <-         (run []      $ Redis.lrange Redis.eventStreamKey fromIndex endIndex)
+
+    -- Go through all the unprocessed events,
+    -- and run `eventHandler` for each one.
+    events
+        |> map (Redis.msgFromString .> getNaked)
+        |> sequence
+
+    -- Update last-received list-index,
+    -- as a result from the continuation above.
+    endIndex
+        |> show
+        |> Redis.set Redis.hashStorageKey
+        |> Redis.runRedis conn
 
 
     -- Scotty
@@ -63,24 +85,40 @@ main = do
 -}
 onMessage :: Redis.Connection -> Redis.Message -> IO Redis.PubSub
 onMessage conn msg = do
-    -- Also store the MD5 hash of this message.
+
+    -- Get the list index of this message.
+    -- Which is the length of the stream minus one.
+    index <- Redis.eventStreamKey
+                |> Redis.llen
+                |> Redis.run conn 0
+                |> map (\x -> x - 1)
+
+    -- Also store the list index of this message.
     -- So we know what message was last received.
-    msg
-        |> Redis.msgMessage
-        |> MD5.hash
+    index
+        |> show
         |> Redis.set Redis.hashStorageKey
         |> Redis.runRedis conn
 
     -- Do something with the event.
     -- {!} Asynchronous IO
     msg
-        |> Redis.decodeMessage
-        |> map eventHandler
-        |> maybe mempty (\fn -> fn msg)
+        |> getNaked
         |> async
 
     -- ✌️
     return mempty
+
+
+{-| Decode the Redis message into a NakedEvent,
+    and then send the NE and the message to the `eventHandler`.
+-}
+getNaked :: Redis.Message -> IO ()
+getNaked msg =
+    msg
+        |> Redis.decodeMessage
+        |> map eventHandler
+        |> maybe mempty (\fn -> fn msg)
 
 
 {-| Pattern match to do something with the incoming event.
@@ -89,6 +127,7 @@ onMessage conn msg = do
 eventHandler :: NakedEvent -> Redis.Message -> IO ()
 eventHandler NakedEvent { typ = "CREATE_USER" } = tryDoing Subjects.User.create
 eventHandler _ = const mempty
+
 
 {-| Decode the Redis message based on a "handler" function,
     and then run the handler function with the result.
@@ -112,19 +151,31 @@ createUser conn = do
     t <- beamMeUpScotty Time.currentUnixTime
 
     -- Create event
-    let event   = Subjects.User.creationEvent e t
-    let msg     = ByteString.Lazy.toStrict (Aeson.encode event)
+    let event = Subjects.User.creationEvent e t
 
     -- Send event to Redis
-    [ msg ]
-        |> Redis.rpush Redis.eventStreamKey
-        |> Redis.runRedis conn
-        |> beamMeUpScotty
-
-    msg
-        |> Redis.publish Redis.channel
-        |> Redis.runRedis conn
+    event
+        |> Aeson.encode
+        |> ByteString.Lazy.toStrict
+        |> sendEvent conn
         |> beamMeUpScotty
 
     -- Response
     Scotty.text "{ \"data\": { \"authToken\": \"example\" } }"
+
+
+
+-- Notify
+
+
+sendEvent :: Redis.Connection -> Strict.ByteString -> IO ()
+sendEvent conn event = do
+    [ event ]
+        |> Redis.rpush Redis.eventStreamKey
+        |> Redis.runRedis conn
+
+    event
+        |> Redis.publish Redis.channel
+        |> Redis.runRedis conn
+
+    return ()
