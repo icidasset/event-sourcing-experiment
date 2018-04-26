@@ -1,0 +1,5 @@
+#!/bin/bash
+dropdb event-sourcing-experiment
+rm -rf ./system/Ledger
+createdb event-sourcing-experiment
+./system/assess

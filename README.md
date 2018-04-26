@@ -25,10 +25,7 @@ createdb event-sourcing-experiment
 ./system/assess
 
 # Reset and replay entire history
-dropdb event-sourcing-experiment
-rm -rf ./system/Ledger
-createdb event-sourcing-experiment
-./system/assess
+./system/reset
 ./system/replay
 ```
 
