@@ -25,6 +25,10 @@ createdb event-sourcing-experiment
 ./system/assess
 
 # Reset and replay entire history
+dropdb event-sourcing-experiment
+rm -rf ./system/Ledger
+createdb event-sourcing-experiment
+./system/assess
 ./system/replay
 ```
 
@@ -53,6 +57,7 @@ Application-level events are stored in Redis.
 
 
 
+
 ## Notes
 
 As this is an experiment, there are obviously quite a few things missing. I'm making a list of them here, in case I might use this system in production sometime in the future.
@@ -60,6 +65,7 @@ As this is an experiment, there are obviously quite a few things missing. I'm ma
 - Database connection pool
 - Environment handling (`dev`, `production`, etc)
 - Asynchronous error handling
+- Tests
 
 
 ### Asynchronous error handling

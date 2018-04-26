@@ -1,9 +1,12 @@
 module Events where
 
 import Data.Text.Lazy (Text)
-import Protolude (Generic, Integer, Maybe, Show)
+import Flow
+import Protolude hiding (Text)
 
 import qualified Data.Aeson as Aeson
+import qualified Database.Redis as Redis
+import qualified Redis
 
 
 -- Event
@@ -31,3 +34,16 @@ data NakedEvent = NakedEvent
 
 
 instance Aeson.FromJSON NakedEvent
+
+
+{-| Decode a Redis message into a NakedEvent,
+    and then send the NE and the message to the `handler`.
+
+    {!} Doesn't do anything if it cannot decode the message.
+-}
+getNaked :: (NakedEvent -> Redis.Message -> IO ()) -> Redis.Message -> IO ()
+getNaked handler msg =
+    msg
+        |> Redis.decodeMessage
+        |> map handler
+        |> maybe mempty (\fn -> fn msg)

@@ -1,6 +1,5 @@
 module Main where
 
-import Events (NakedEvent(..))
 import Flow
 import Prelude (read)
 import Protolude hiding (ByteString)
@@ -11,7 +10,9 @@ import qualified Data.ByteString as Strict (ByteString)
 import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import qualified Database.Redis as Redis
+import qualified Events
 import qualified Redis
+import qualified Subjects
 import qualified Subjects.User
 import qualified Time
 
@@ -50,9 +51,9 @@ main = do
     events      <-         (run []      $ Redis.lrange Redis.eventStreamKey fromIndex endIndex)
 
     -- Go through all the unprocessed events,
-    -- and run `eventHandler` for each one.
+    -- and run `handleEvent` for each one.
     events
-        |> map (Redis.msgFromString .> getNaked)
+        |> map (Redis.msgFromString .> Events.getNaked Subjects.handleEvent)
         |> sequence
 
     -- Update last-received list-index,
@@ -80,7 +81,7 @@ main = do
 
 {-| Function that will be called when we receive a message from the channel.
     Decodes the message into a `NakedEvent`, which is the same as `Event`,
-    but without a payload. Then uses the `eventHandler` function below to
+    but without a payload. Then uses the `handleEvent` function to
     actually do something with the event.
 -}
 onMessage :: Redis.Connection -> Redis.Message -> IO Redis.PubSub
@@ -103,37 +104,11 @@ onMessage conn msg = do
     -- Do something with the event.
     -- {!} Asynchronous IO
     msg
-        |> getNaked
+        |> Events.getNaked Subjects.handleEvent
         |> async
 
     -- ✌️
     return mempty
-
-
-{-| Decode the Redis message into a NakedEvent,
-    and then send the NE and the message to the `eventHandler`.
--}
-getNaked :: Redis.Message -> IO ()
-getNaked msg =
-    msg
-        |> Redis.decodeMessage
-        |> map eventHandler
-        |> maybe mempty (\fn -> fn msg)
-
-
-{-| Pattern match to do something with the incoming event.
-    A `NakedEvent` is an `Event` without a payload.
--}
-eventHandler :: NakedEvent -> Redis.Message -> IO ()
-eventHandler NakedEvent { typ = "CREATE_USER" } = tryDoing Subjects.User.create
-eventHandler _ = const mempty
-
-
-{-| Decode the Redis message based on a "handler" function,
-    and then run the handler function with the result.
--}
-tryDoing :: Aeson.FromJSON a => (a -> IO ()) -> Redis.Message -> IO ()
-tryDoing fn = Redis.decodeMessage .> maybe mempty fn
 
 
 
